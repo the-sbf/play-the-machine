@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en-ZA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Play the Machine</title>
+
+<!-- =====================================================================
+     CONTENT. Everything a scholar reads lives in this object.
+     Change copy here; the engine below does not need to be touched.
+     ===================================================================== -->
+<script>
+window.MACHINE = {
+  "seconds": 30,
+  "finalAt": 6,
+
+  /* Order of the three buttons on screen. Keys 1, 2, 3 and swipe left, up, right follow this order. */
+  "buttons": ["test", "urgent", "clear"],
+
+  /* Shown in this order on the rules screen. */
+  "rules": [
+    { "id": "urgent", "label": "Urgent", "rule": "Weight loss and night sweats" },
+    { "id": "test",   "label": "Test",   "rule": "A cough for more than two weeks" },
+    { "id": "clear",  "label": "Clear",  "rule": "Everything else" }
+  ],
+
+  "deck": [
+    { "name": "Johan",     "age": 45, "chips": ["Cough for 3 weeks"],                                    "answer": "test" },
+    { "name": "Priya",     "age": 32, "chips": ["Headache since yesterday"],                             "answer": "clear" },
+    { "name": "Ayesha",    "age": 19, "chips": ["Weight loss", "Night sweats"],                          "answer": "urgent" },
+    { "name": "Thabo",     "age": 60, "chips": ["Cough for 4 days"],                                     "answer": "clear" },
+    { "name": "Megan",     "age": 27, "chips": ["Cough for 5 weeks", "Tired"],                           "answer": "test" },
+    { "name": "Mr Chen",   "age": 51, "chips": ["Sore knee"],                                            "answer": "clear" },
+    { "name": "Lerato",    "age": 8,  "chips": ["Cough for 3 weeks", "Night sweats"],                    "answer": "test" },
+    { "name": "Fatima",    "age": 41, "chips": ["Weight loss", "Night sweats", "Cough for 1 week"],      "answer": "urgent" },
+    { "name": "Pieter",    "age": 70, "chips": ["Sprained wrist"],                                       "answer": "clear" },
+    { "name": "Nomvula",   "age": 36, "chips": ["Cough for 10 days"],                                    "answer": "clear" },
+    { "name": "Dev",       "age": 23, "chips": ["Cough for 3 days", "Runny nose"],                       "answer": "clear" },
+    { "name": "Chantal",   "age": 55, "chips": ["Cough for 6 weeks"],                                    "answer": "test" },
+    { "name": "Sipho",     "age": 15, "chips": ["Sunburn"],                                              "answer": "clear" },
+    { "name": "Mrs Botha", "age": 67, "chips": ["Night sweats", "Weight loss"],                          "answer": "urgent" },
+    { "name": "Yusuf",     "age": 30, "chips": ["Cough for 2 weeks and 3 days"],                         "answer": "test" },
+    { "name": "Emma",      "age": 12, "chips": ["Blister on heel"],                                      "answer": "clear" }
+  ],
+
+  "final": {
+    "name": "Mr Abrahams",
+    "age": 74,
+    "line": "Since my wife passed, I do not eat much. Is that something?"
+  },
+
+  "copy": {
+    "title": "Play the Machine",
+    "intro": "You are the sorting machine at a busy clinic. Three rules. Thirty seconds.",
+    "tiebreak": "Urgent beats Test: a patient with both sets of symptoms is Urgent.",
+    "tiebreakShort": "Urgent beats Test.",
+    "smallPrint": "A simplified game rule, not medical advice.",
+    "start": "Start sorting",
+    "keys": "Tap a button, or press 1, 2 or 3.",
+    "sorted": "Sorted",
+    "streak": "Streak",
+    "secondsLeft": "seconds left",
+    "secondsShort": "s",
+    "patientNo": "Patient {n}",
+    "noRule": "No rule fits.",
+    "end1": "Time. You sorted {sorted} {patients} in {seconds} seconds, {correct} of them correctly.",
+    "patientOne": "patient",
+    "patientMany": "patients",
+    "end2": "You could not sort Mr Abrahams.",
+    "end3": "He did not fit a rule. He is still sitting there.",
+    "next": "Continue to the next slide",
+    "nextHint": "Use the arrow to go to the next slide.",
+    "again": "Play again"
+  }
+};
+</script>
+
+<style>
+  :root {
+    --surround: #E3E9EB;
+    --panel: #13232C;
+    --panel-2: #1B303B;
+    --line: #36525F;
+    --text: #DCE9EC;
+    --dim: #97AEB7;
+    --urgent: #F4B544;
+    --test: #76C6F1;
+    --clear: #A9D6B3;
+    --dead: #70848D;
+    --paper: #F6EED6;
+    --ink: #33291F;
+    --ink-soft: #6A5B4B;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --surround: #070D11; }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--surround);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 16px;
+    line-height: 1.45;
+    -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
+    padding: 8px;
+  }
+
+  .panel {
+    position: relative;
+    height: calc(100vh - 16px);
+    height: calc(100dvh - 16px);
+    min-height: 540px;
+    max-width: 560px;
+    margin: 0 auto;
+    background: var(--panel);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .screen { display: none; flex: 1; min-height: 0; flex-direction: column; padding: 20px 14px 14px; }
+  .screen.on { display: flex; }
+
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+    outline: 3px solid #FFFFFF;
+    outline-offset: 2px;
+  }
+  [tabindex="-1"]:focus { outline: none; }
+
+  h1 { font-size: 26px; line-height: 1.15; margin: 0 0 10px; font-weight: 700; letter-spacing: -0.01em; }
+  p { margin: 0; }
+
+  /* ---------- Rules screen ---------- */
+  #rules { overflow-y: auto; }
+  .intro { color: var(--text); margin-bottom: 16px; max-width: 34em; }
+  .rulecards { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+  .rulecards li {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-left-width: 5px;
+    border-radius: 6px;
+    padding: 12px;
+  }
+  .rulecards .lab { font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+  .rulecards .txt { font-size: 16px; }
+  .tie { color: var(--text); font-size: 16px; margin-bottom: 10px; }
+  .small { color: var(--dim); font-size: 14px; }
+  .grow { flex: 1; min-height: 12px; }
+  .primary {
+    width: 100%;
+    min-height: 56px;
+    border: 0;
+    border-radius: 6px;
+    background: var(--text);
+    color: var(--panel);
+    font-weight: 700;
+    font-size: 17px;
+    padding: 12px 16px;
+  }
+  .primary:hover { background: #FFFFFF; }
+  .keys { color: var(--dim); font-size: 14px; text-align: center; margin-top: 10px; }
+
+  /* rule colours, always paired with a glyph and a word */
+  [data-rule="urgent"] { --c: var(--urgent); }
+  [data-rule="test"]   { --c: var(--test); }
+  [data-rule="clear"]  { --c: var(--clear); }
+  .rulecards li { border-left-color: var(--c); }
+  .rulecards .lab { color: var(--c); }
+  .glyph { width: 16px; height: 16px; flex: none; }
+  .glyph * { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+
+  /* ---------- Sort screen ---------- */
+  #sort { padding-top: 0; }
+  .timer { height: 6px; background: #0C1A21; margin: 0 -14px; position: relative; }
+  .timer .bar { position: absolute; inset: 0; background: var(--text); transform-origin: left center; }
+  .timer.low .bar { background: var(--urgent); }
+  .readout { display: flex; align-items: baseline; gap: 18px; padding: 12px 0 6px; font-size: 14px; color: var(--dim); }
+  .readout > span { white-space: nowrap; }
+  .readout b { color: var(--text); font-size: 22px; font-weight: 700; margin-left: 6px; display: inline-block; min-width: 2ch; font-variant-numeric: tabular-nums; }
+  .readout .secs { margin-left: auto; display: none; }
+  .bump { animation: bump 160ms ease-out; }
+  @keyframes bump { from { transform: translateY(-4px); opacity: 0.4; } }
+
+  .slot { position: relative; flex: 1; min-height: 172px; }
+  .wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 6px 0; }
+  .wrap.in { animation: in-right 170ms cubic-bezier(.2,.7,.2,1); }
+  .wrap.slow { animation: in-slow 1500ms cubic-bezier(.2,.6,.2,1); }
+  .wrap.out-left { animation: out-left 180ms ease-in forwards; }
+  .wrap.out-up { animation: out-up 180ms ease-in forwards; }
+  .wrap.out-right { animation: out-right 180ms ease-in forwards; }
+  .wrap.out-fade { animation: out-fade 260ms ease-in forwards; }
+  @keyframes in-right { from { transform: translateX(70%); opacity: 0; } }
+  @keyframes in-slow { from { transform: translateX(34%); opacity: 0; } }
+  @keyframes out-left { to { transform: translateX(-110%) rotate(-4deg); opacity: 0; } }
+  @keyframes out-up { to { transform: translateY(-110%); opacity: 0; } }
+  @keyframes out-right { to { transform: translateX(110%) rotate(4deg); opacity: 0; } }
+  @keyframes out-fade { to { opacity: 0; transform: translateY(10px); } }
+
+  .card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .card .no { color: var(--dim); font-size: 13px; margin-bottom: 6px; }
+  .card .who { font-size: 22px; font-weight: 700; line-height: 1.2; margin-bottom: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+  .chips li { border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; font-size: 16px; line-height: 1.3; background: var(--panel); }
+
+  /* The one card that is not a data card. */
+  .card.paper {
+    background: var(--paper);
+    color: var(--ink);
+    border: 0;
+    border-radius: 3px;
+    padding: 20px 18px 22px;
+    font-family: var(--serif);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    transform: rotate(-1.2deg);
+  }
+  .card.paper .who { font-size: 19px; font-weight: 400; color: var(--ink-soft); margin-bottom: 10px; }
+  .card.paper .line { font-size: 23px; line-height: 1.38; margin: 0; quotes: "\201C" "\201D"; }
+  .card.paper .line::before { content: open-quote; }
+  .card.paper .line::after { content: close-quote; }
+
+  .tick {
+    position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px;
+    pointer-events: none; color: var(--text); display: none;
+  }
+  .tick.show { display: block; animation: tick 150ms ease-out; }
+  .tick path { fill: none; stroke: currentColor; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+  @keyframes tick { from { transform: scale(0.6); opacity: 0; } }
+
+  .note { min-height: 24px; font-size: 14px; color: var(--dim); text-align: center; margin: 4px 0 8px; }
+  .note.loud { color: var(--text); font-size: 17px; font-weight: 700; }
+
+  .buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .sortbtn {
+    min-height: 104px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-top: 4px solid var(--c);
+    border-radius: 6px;
+    padding: 8px 6px 26px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    position: relative;
+  }
+  .sortbtn .top { display: flex; align-items: center; gap: 6px; color: var(--c); font-weight: 700; font-size: 17px; line-height: 1.2; min-height: 30px; }
+  .sortbtn .key { position: absolute; right: 6px; bottom: 6px; color: var(--dim); font-weight: 400; font-size: 12px; line-height: 1.3; border: 1px solid var(--line); border-radius: 3px; padding: 0 5px; }
+  .sortbtn .rule { font-size: 12.5px; line-height: 1.3; color: var(--text); }
+  .sortbtn:hover { background: #223A46; }
+  .sortbtn.ok { background: var(--c); }
+  .sortbtn.ok .top, .sortbtn.ok .rule, .sortbtn.ok .key { color: var(--panel); border-color: var(--panel); }
+  .sortbtn.was { background: var(--c); outline: 3px solid var(--text); outline-offset: 2px; }
+  .sortbtn.was .top, .sortbtn.was .rule, .sortbtn.was .key { color: var(--panel); border-color: var(--panel); }
+  .buttons.marking .sortbtn:not(.was):not(.ok) { opacity: 0.35; }
+  .buttons.dead .sortbtn { --c: var(--dead); border-style: dashed; border-top-style: dashed; background: transparent; }
+  .buttons.dead .sortbtn .rule, .buttons.dead .sortbtn .key { color: var(--dead); }
+  .buttons.dead .sortbtn:hover { background: transparent; }
+  .sortbtn.shake { animation: shake 320ms ease-in-out; }
+  @keyframes shake {
+    20% { transform: translateX(-6px); } 40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); } 80% { transform: translateX(4px); }
+  }
+
+  /* ---------- End screen ---------- */
+  #end { overflow-y: auto; padding-top: 24px; }
+  .endlines { display: grid; gap: 12px; margin-bottom: 18px; }
+  .endlines p { font-size: 17px; max-width: 36em; }
+  .endlines p:first-child { color: var(--dim); }
+  .endcard { display: flex; justify-content: center; padding: 4px 4px 22px; }
+  .endcard .card.paper { max-width: 340px; padding: 16px 16px 18px; }
+  .endcard .card.paper .line { font-size: 19px; }
+  .reveal { animation: reveal 500ms ease-out backwards; }
+  @keyframes reveal { from { opacity: 0; transform: translateY(6px); } }
+  .linkbtn { background: none; border: 0; color: var(--dim); text-decoration: underline; text-underline-offset: 3px; font-size: 16px; padding: 12px; margin: 4px auto 0; display: block; }
+  .linkbtn:hover { color: var(--text); }
+  .hint { min-height: 22px; text-align: center; font-size: 14px; color: var(--text); margin-top: 8px; }
+
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  @media (min-width: 520px) {
+    .screen { padding: 26px 26px 22px; }
+    .timer { margin: 0 -26px; }
+    h1 { font-size: 30px; }
+    .sortbtn { padding: 10px 12px 26px; }
+    .sortbtn .rule { font-size: 14px; }
+  }
+
+  /* Reduced motion: cards cut in, nothing ticks, the timer is a number. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .timer .bar { display: none; }
+    .timer { background: transparent; height: 0; }
+    .readout .secs { display: block; }
+  }
+</style>
+</head>
+
+<body>
+<main class="panel" id="panel">
+
+  <section class="screen on" id="rules" aria-labelledby="title">
+    <h1 id="title" tabindex="-1"></h1>
+    <p class="intro" id="intro"></p>
+    <ul class="rulecards" id="rulecards"></ul>
+    <p class="tie" id="tie"></p>
+    <p class="small" id="smallprint"></p>
+    <div class="grow"></div>
+    <button class="primary" id="start" type="button"></button>
+    <p class="keys" id="keys"></p>
+  </section>
+
+  <section class="screen" id="sort" aria-label="Sorting" tabindex="-1">
+    <div class="timer" id="timer"><div class="bar" id="bar"></div></div>
+    <div class="readout">
+      <span><span id="lab-sorted"></span><b id="n-sorted">0</b></span>
+      <span><span id="lab-streak"></span><b id="n-streak">0</b></span>
+      <span class="secs" id="secs" role="timer" aria-live="off"><b id="n-secs">30</b><span id="lab-secs" aria-hidden="true"></span></span>
+    </div>
+    <div class="slot" id="slot" aria-live="polite">
+      <svg class="tick" id="tick" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 34l12 12 24-28"/></svg>
+    </div>
+    <p class="note" id="note" role="status"></p>
+    <div class="buttons" id="buttons"></div>
+  </section>
+
+  <section class="screen" id="end" aria-label="Results">
+    <div class="endlines" id="endlines" tabindex="-1">
+      <p class="reveal" id="end1"></p>
+      <p class="reveal" id="end2" style="animation-delay: 900ms"></p>
+      <p class="reveal" id="end3" style="animation-delay: 1900ms"></p>
+    </div>
+    <div class="endcard reveal" id="endcard" style="animation-delay: 1900ms"></div>
+    <div class="grow"></div>
+    <div class="reveal" style="animation-delay: 2700ms">
+      <button class="primary" id="next" type="button"></button>
+      <p class="hint" id="hint" role="status"></p>
+      <button class="linkbtn" id="again" type="button"></button>
+    </div>
+  </section>
+
+</main>
+
+<!-- =====================================================================
+     ENGINE. No scholar-facing text below this line.
+     ===================================================================== -->
+<script>
+(function () {
+  "use strict";
+
+  var C = window.MACHINE;
+  var T = C.copy;
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var S = null;          // game state
+  var loop = null;       // timer interval
+  var pending = null;    // timeout between cards
+
+  var GLYPHS = {
+    urgent: '<svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.2l6.2 11.3H1.8z"/></svg>',
+    test: '<svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.6"/></svg>',
+    clear: '<svg class="glyph" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4"/></svg>'
+  };
+  var DIRS = ["left", "up", "right"];
+
+  function $(id) { return document.getElementById(id); }
+  function fill(text, vars) {
+    return String(text).replace(/\{(\w+)\}/g, function (m, k) {
+      return Object.prototype.hasOwnProperty.call(vars, k) ? vars[k] : m;
+    });
+  }
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function ruleById(id) {
+    for (var i = 0; i < C.rules.length; i++) if (C.rules[i].id === id) return C.rules[i];
+    return null;
+  }
+  function now() { return (window.performance && performance.now) ? performance.now() : Date.now(); }
+  function show(id) {
+    ["rules", "sort", "end"].forEach(function (s) { $(s).classList.toggle("on", s === id); });
+  }
+  function focusQuietly(node) {
+    try { node.focus({ preventScroll: true }); } catch (e) { /* older browsers */ }
+  }
+  function tell(type, data) {
+    if (window.parent && window.parent !== window) {
+      var msg = { type: type };
+      for (var k in data) msg[k] = data[k];
+      try { window.parent.postMessage(msg, "*"); } catch (e) { /* harmless */ }
+    }
+  }
+
+  /* ---------- Static text ---------- */
+  function build() {
+    document.title = T.title;
+    $("title").textContent = T.title;
+    $("intro").textContent = T.intro;
+    $("tie").textContent = T.tiebreak;
+    $("smallprint").textContent = T.smallPrint;
+    $("start").textContent = T.start;
+    $("keys").textContent = T.keys;
+    $("lab-sorted").textContent = T.sorted;
+    $("lab-streak").textContent = T.streak;
+    $("lab-secs").textContent = T.secondsShort;
+    $("secs").setAttribute("aria-label", T.secondsLeft);
+    $("next").textContent = T.next;
+    $("again").textContent = T.again;
+
+    var list = $("rulecards");
+    C.rules.forEach(function (r) {
+      var li = el("li");
+      li.setAttribute("data-rule", r.id);
+      var lab = el("span", "lab");
+      lab.innerHTML = GLYPHS[r.id] || "";
+      lab.appendChild(document.createTextNode(r.label));
+      li.appendChild(lab);
+      li.appendChild(el("span", "txt", r.rule));
+      list.appendChild(li);
+    });
+
+    var row = $("buttons");
+    C.buttons.forEach(function (id, i) {
+      var r = ruleById(id);
+      var b = el("button", "sortbtn");
+      b.type = "button";
+      b.id = "btn-" + id;
+      b.setAttribute("data-rule", id);
+      var top = el("span", "top");
+      top.innerHTML = GLYPHS[id] || "";
+      top.appendChild(el("span", "", r.label));
+      var key = el("span", "key", String(i + 1));
+      key.setAttribute("aria-hidden", "true");
+      top.appendChild(key);
+      b.appendChild(top);
+      b.appendChild(el("span", "rule", r.rule));
+      b.addEventListener("click", function () { choose(id); });
+      row.appendChild(b);
+    });
+  }
+
+  /* ---------- Cards ---------- */
+  function cardNode(card, n) {
+    var c = el("div", "card");
+    c.appendChild(el("div", "no", fill(T.patientNo, { n: n < 10 ? "0" + n : n })));
+    c.appendChild(el("div", "who", card.name + ", " + card.age));
+    var ul = el("ul", "chips");
+    card.chips.forEach(function (chip) { ul.appendChild(el("li", "", chip)); });
+    c.appendChild(ul);
+    return c;
+  }
+  function paperNode() {
+    var c = el("div", "card paper");
+    c.appendChild(el("div", "who", C.final.name + ", " + C.final.age));
+    c.appendChild(el("p", "line", C.final.line));
+    return c;
+  }
+  function place(node, cls) {
+    var w = el("div", "wrap" + (cls ? " " + cls : ""));
+    w.appendChild(node);
+    $("slot").appendChild(w);
+    S.wrap = w;
+    return w;
+  }
+  function sendOff(cls) {
+    var w = S.wrap;
+    S.wrap = null;
+    if (!w) return;
+    if (reduce.matches) { w.remove(); return; }
+    w.classList.remove("in");
+    w.classList.add(cls);
+    setTimeout(function () { w.remove(); }, 280);
+  }
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function draw() {
+    if (S.pos >= S.order.length) {
+      // Deck finished before the final card: reshuffle and keep going.
+      var last = S.order[S.order.length - 1];
+      S.order = shuffle(S.order.slice());
+      if (S.order.length > 1 && S.order[0] === last) { S.order.push(S.order.shift()); }
+      S.pos = 0;
+    }
+    return C.deck[S.order[S.pos++]];
+  }
+  function deal() {
+    S.card = draw();
+    S.dealt++;
+    place(cardNode(S.card, S.dealt), "in");
+    attachSwipe(S.wrap);
+  }
+
+  /* ---------- Timer ---------- */
+  function remaining() { return Math.max(0, C.seconds - (now() - S.t0) / 1000); }
+  function tick() {
+    if (!S || S.phase !== "sort") return;
+    var r = remaining();
+    $("bar").style.transform = "scaleX(" + (r / C.seconds).toFixed(4) + ")";
+    var whole = Math.ceil(r);
+    if (whole !== S.shownSecs) { S.shownSecs = whole; $("n-secs").textContent = whole; }
+    if (!S.finalShown && r <= C.finalAt) showFinal();
+    if (r <= 0) finish();
+  }
+
+  /* ---------- Play ---------- */
+  function start() {
+    clearInterval(loop); clearTimeout(pending);
+    var order = [];
+    for (var i = 0; i < C.deck.length; i++) order.push(i);
+    S = {
+      phase: "sort", t0: now(), order: order, pos: 0, dealt: 0,
+      sorted: 0, correct: 0, streak: 0,
+      card: null, wrap: null, lock: false, finalShown: false, finalAtRemaining: null, shownSecs: null
+    };
+    var slot = $("slot");
+    Array.prototype.slice.call(slot.querySelectorAll(".wrap")).forEach(function (w) { w.remove(); });
+    $("buttons").className = "buttons";
+    clearMarks();
+    setNote(T.tiebreakShort, false);
+    $("timer").classList.remove("low");
+    $("n-sorted").textContent = "0";
+    $("n-streak").textContent = "0";
+    $("hint").textContent = "";
+    show("sort");
+    deal();
+    tick();
+    loop = setInterval(tick, 50);
+    focusQuietly($("sort"));
+  }
+
+  function setNote(text, loud) {
+    var n = $("note");
+    n.textContent = text;
+    n.classList.toggle("loud", !!loud);
+  }
+  function setCount(id, value) {
+    var n = $(id);
+    n.textContent = value;
+    n.classList.remove("bump");
+    void n.offsetWidth;
+    n.classList.add("bump");
+  }
+  function clearMarks() {
+    $("buttons").classList.remove("marking");
+    C.buttons.forEach(function (id) { $("btn-" + id).classList.remove("ok", "was", "shake"); });
+    $("tick").classList.remove("show");
+  }
+
+  function choose(id) {
+    if (!S || S.phase !== "sort") return;
+    if (S.finalShown) { refuse(id); return; }
+    if (S.lock || !S.card) return;
+
+    var ok = id === S.card.answer;
+    var answer = S.card.answer;
+    S.sorted++;
+    if (ok) { S.correct++; S.streak++; } else { S.streak = 0; }
+    setCount("n-sorted", S.sorted);
+    setCount("n-streak", S.streak);
+
+    S.card = null;
+    S.lock = true;
+    sendOff("out-" + DIRS[C.buttons.indexOf(id)]);
+
+    if (ok) {
+      $("btn-" + id).classList.add("ok");
+      var t = $("tick"); t.classList.remove("show"); void t.offsetWidth; t.classList.add("show");
+    } else {
+      // Show where the card belonged, for half a second. No time is taken off the clock.
+      $("buttons").classList.add("marking");
+      $("btn-" + answer).classList.add("was");
+    }
+
+    pending = setTimeout(function () {
+      pending = null;
+      clearMarks();
+      S.lock = false;
+      if (S.phase !== "sort" || S.finalShown) return;
+      // Too close to the final card to deal another: leave the slot empty for a moment.
+      if (remaining() - C.finalAt < 0.6) return;
+      deal();
+    }, ok ? 150 : 500);
+  }
+
+  function showFinal() {
+    S.finalShown = true;
+    S.finalAtRemaining = remaining();
+    clearTimeout(pending); pending = null;
+    clearMarks();
+    S.lock = false;
+    // A card still on screen is withdrawn unsorted. It is not counted.
+    if (S.wrap) sendOff("out-fade");
+    S.card = null;
+    $("buttons").classList.add("dead");
+    C.buttons.forEach(function (id) { $("btn-" + id).setAttribute("aria-disabled", "true"); });
+    $("timer").classList.add("low");
+    setNote("", false);
+    place(paperNode(), "slow");
+  }
+
+  function refuse(id) {
+    var b = $("btn-" + id);
+    b.classList.remove("shake");
+    void b.offsetWidth;
+    b.classList.add("shake");
+    setNote("", true);
+    // Re-set on the next frame so the status is announced each time.
+    setTimeout(function () { if (S && S.finalShown && S.phase === "sort") setNote(T.noRule, true); }, 20);
+  }
+
+  function finish() {
+    S.phase = "end";
+    clearInterval(loop);
+    $("bar").style.transform = "scaleX(0)";
+    $("n-secs").textContent = "0";
+    var result = { sorted: S.sorted, correct: S.correct };
+    S.result = result;
+    setTimeout(function () {
+      $("end1").textContent = fill(T.end1, {
+        sorted: result.sorted,
+        correct: result.correct,
+        seconds: C.seconds,
+        patients: result.sorted === 1 ? T.patientOne : T.patientMany
+      });
+      $("end2").textContent = T.end2;
+      $("end3").textContent = T.end3;
+      var holder = $("endcard");
+      holder.textContent = "";
+      holder.appendChild(paperNode());
+      C.buttons.forEach(function (id) { $("btn-" + id).removeAttribute("aria-disabled"); });
+      show("end");
+      focusQuietly($("endlines"));
+      tell("machine:complete", result);
+    }, reduce.matches ? 0 : 900);
+  }
+
+  /* ---------- Swipe (optional extra; buttons and keys always work) ---------- */
+  function attachSwipe(node) {
+    var x0 = null, y0 = null;
+    node.addEventListener("pointerdown", function (e) { x0 = e.clientX; y0 = e.clientY; });
+    node.addEventListener("pointerup", function (e) {
+      if (x0 === null) return;
+      var dx = e.clientX - x0, dy = e.clientY - y0;
+      x0 = null;
+      var idx = -1;
+      if (Math.abs(dx) > 44 && Math.abs(dx) > Math.abs(dy)) idx = dx < 0 ? 0 : 2;
+      else if (dy < -44 && Math.abs(dy) > Math.abs(dx)) idx = 1;
+      if (idx >= 0 && C.buttons[idx]) choose(C.buttons[idx]);
+    });
+    node.addEventListener("pointercancel", function () { x0 = null; });
+  }
+
+  /* ---------- Wiring ---------- */
+  build();
+  $("start").addEventListener("click", start);
+  $("again").addEventListener("click", function () {
+    show("rules");
+    focusQuietly($("title"));
+  });
+  $("next").addEventListener("click", function () {
+    tell("machine:next", S && S.result ? S.result : {});
+    $("hint").textContent = T.nextHint;
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!S || S.phase !== "sort") return;
+    var idx = ["1", "2", "3"].indexOf(e.key);
+    if (idx >= 0 && C.buttons[idx]) { e.preventDefault(); choose(C.buttons[idx]); }
+  });
+
+  // Read-only view of the state, for testing.
+  window.__machine = { state: function () { return S; }, remaining: function () { return S ? remaining() : null; } };
+})();
+</script>
+</body>
+</html>
